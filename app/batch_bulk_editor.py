@@ -526,20 +526,27 @@ def create_parameter_or_formulavalue(row_dict, filepath, tree, node_info, stats)
         new_el = etree.Element("{urn:Rockwell/MasterRecipe}Parameter")
         nm_el = etree.SubElement(new_el, "{urn:Rockwell/MasterRecipe}Name")
         nm_el.text = row_dict.get("Name", "")
-        # fill sub elements (only if non blank)
+        
+        # Define the possible sub-elements
+        sub_elements_order = ["ERPAlias", "PLCReference", "EnumerationSet", "EnumerationMember", "Integer", "High", "Low", "EngineeringUnits", "Scale"]
+        
         created_sub_count = 0
-        for k, v in row_dict.items():
-            if k in ("FullPath", "TagType", "Name"):
-                continue
-            if k.startswith("FormulaValueLimit_"):
-                continue
-            if v.strip() == "":
-                # user gave blank => skip creation
-                continue
-            sub_el = etree.SubElement(new_el, f"{{urn:Rockwell/MasterRecipe}}{k}")
-            sub_el.text = v
-            created_sub_count += 1
-        root.append(new_el)
+        for sub_el_name in sub_elements_order:
+            value = row_dict.get(sub_el_name, "")
+            if value.strip() != "" or sub_el_name == "ERPAlias" or sub_el_name == "EngineeringUnits":  # Ensure ERPAlias and EngineeringUnits are always included
+                sub_el = etree.SubElement(new_el, f"{{urn:Rockwell/MasterRecipe}}{sub_el_name}")
+                sub_el.text = value
+                created_sub_count += 1
+        
+        # Find the last parameter element and insert the new parameter after it
+        last_param = None
+        for elem in root.findall("{urn:Rockwell/MasterRecipe}Parameter"):
+            last_param = elem
+        if last_param is not None:
+            last_param.addnext(new_el)
+        else:
+            root.append(new_el)
+        
         stats["created_count"] += 1
         logger.debug(f"Created Parameter with {created_sub_count} sub-elements: {fp}")
 
@@ -559,140 +566,49 @@ def create_parameter_or_formulavalue(row_dict, filepath, tree, node_info, stats)
         logger.warning(f"Unrecognized path => {fp}")
 
 
-def apply_formulavalue_updates(fv_element, row_dict, original_info):
+def apply_formulavalue_updates(new_el, row_dict, original_info=None):
     """
-    If there's no original_info => creation from scratch
-    If there is original_info => partial update
+    Ensures the correct order of sub-elements within <FormulaValue>
+    and prevents duplicate entries.
     """
-    ns = fv_element.nsmap
+    # Expected order of child elements inside <FormulaValue>
+    FORMULA_ORDER = ["Name", "Display", "Defer", "EnumerationSet", "EnumerationMember"]
 
-    # handle normal sub elements first
-    if original_info is not None:
-        # partial update
-        original_subs = original_info["OriginalSubs"]  # localName->text
-        for k, new_val in row_dict.items():
-            if k in ("FullPath", "TagType", "Name"):
-                continue
-            if k.startswith("FormulaValueLimit_"):
-                continue
-            old_val = original_subs.get(k, None)
-            if new_val.strip() == "":
-                # user blank
-                if old_val is None:
-                    # didn't exist => skip
-                    continue
-                else:
-                    # existed => preserve => do nothing
-                    pass
-            else:
-                # user gave something => update or create
-                sub_el = fv_element.find(
-                    f"{{urn:Rockwell/MasterRecipe}}{k}", namespaces=ns
-                )
-                if sub_el is None:
-                    sub_el = etree.SubElement(
-                        fv_element, f"{{urn:Rockwell/MasterRecipe}}{k}"
-                    )
-                sub_el.text = new_val
-    else:
-        # creation from scratch => only add if non blank
-        for k, new_val in row_dict.items():
-            if k in ("FullPath", "TagType", "Name"):
-                continue
-            if k.startswith("FormulaValueLimit_"):
-                continue
-            if new_val.strip() == "":
-                continue
-            sub_el = etree.SubElement(fv_element, f"{{urn:Rockwell/MasterRecipe}}{k}")
-            sub_el.text = new_val
+    existing_tags = {etree.QName(child.tag).localname for child in new_el}
 
-    # handle FormulaValueLimit (FVL)
+    # Create elements in the correct order
+    for tag_name in FORMULA_ORDER:
+        if tag_name not in existing_tags:  # Prevent duplicates
+            value = row_dict.get(tag_name, "").strip()
+            if value or tag_name == "EnumerationMember":  # Ensure EnumerationMember exists even if empty
+                sub_el = etree.SubElement(new_el, f"{{urn:Rockwell/MasterRecipe}}{tag_name}")
+                sub_el.text = value
+
+    # Handle FormulaValueLimit separately
     fvl_keys = [k for k in row_dict if k.startswith("FormulaValueLimit_")]
-    if not fvl_keys:
-        return
+    if fvl_keys and "FormulaValueLimit" not in existing_tags:  # Prevent duplicate FormulaValueLimit
+        fvl_el = etree.Element("{urn:Rockwell/MasterRecipe}FormulaValueLimit")
 
-    if original_info is None:
-        # creation from scratch => only create FVL if any value is non-blank
-        any_non_blank = any(row_dict[k].strip() != "" for k in fvl_keys)
-        if not any_non_blank:
-            return
-        fvl_el = etree.SubElement(
-            fv_element, "{urn:Rockwell/MasterRecipe}FormulaValueLimit"
-        )
-        # fill it
-        for k in fvl_keys:
-            v = row_dict[k]
-            suffix = k[len("FormulaValueLimit_") :]
-            if suffix == "Verification":
-                if v.strip():
-                    fvl_el.set("Verification", v)
-            else:
-                if v.strip():
-                    sub_sub = etree.SubElement(
-                        fvl_el, f"{{urn:Rockwell/MasterRecipe}}{suffix}"
-                    )
-                    sub_sub.text = v
-    else:
-        # partial update
-        had_fvl = original_info["HasFormulaValueLimit"]
-        old_ver = original_info["FormulaValueLimitVerification"]
-        old_subs = original_info["FormulaValueLimitSubs"]
-        fvl_el = fv_element.find(
-            "{urn:Rockwell/MasterRecipe}FormulaValueLimit", namespaces=ns
-        )
+        # Set the Verification attribute
+        verification = row_dict.get("FormulaValueLimit_Verification", "").strip()
+        if verification:
+            fvl_el.set("Verification", verification)
 
-        if not had_fvl and fvl_el is None:
-            # only create if user has non-blank
-            any_non_blank = any(row_dict[k].strip() != "" for k in fvl_keys)
-            if any_non_blank:
-                fvl_el = etree.SubElement(
-                    fv_element, "{urn:Rockwell/MasterRecipe}FormulaValueLimit"
-                )
+        # Define the expected order for <FormulaValueLimit> sub-elements
+        FORMULAVALUE_LIMIT_ORDER = [
+            "LowLowLowValue", "LowLowValue", "LowValue",
+            "HighValue", "HighHighValue", "HighHighHighValue"
+        ]
 
-        # if had_fvl => it should exist, else we preserve old
-        if had_fvl and fvl_el is None:
-            # recreate if somehow missing
-            fvl_el = etree.SubElement(
-                fv_element, "{urn:Rockwell/MasterRecipe}FormulaValueLimit"
-            )
-            if old_ver:
-                fvl_el.set("Verification", old_ver)
-            for subk, subv in old_subs.items():
-                sub_sub = etree.SubElement(
-                    fvl_el, f"{{urn:Rockwell/MasterRecipe}}{subk}"
-                )
-                sub_sub.text = subv
+        # Insert sub-elements in the correct order
+        for subtag in FORMULAVALUE_LIMIT_ORDER:
+            sub_val = row_dict.get(f"FormulaValueLimit_{subtag}", "").strip()
+            if sub_val:
+                sub_child = etree.SubElement(fvl_el, f"{{urn:Rockwell/MasterRecipe}}{subtag}")
+                sub_child.text = sub_val
 
-        if fvl_el is None:
-            return  # do nothing if still absent
-
-        # update keys
-        for k in fvl_keys:
-            v = row_dict[k]
-            suffix = k[len("FormulaValueLimit_") :]
-            if suffix == "Verification":
-                if v.strip() == "":
-                    # user blank => preserve if old
-                    if had_fvl:
-                        pass
-                else:
-                    fvl_el.set("Verification", v)
-            else:
-                old_v = old_subs.get(suffix, None) if had_fvl else None
-                if v.strip() == "":
-                    if old_v is None:
-                        pass
-                    else:
-                        pass
-                else:
-                    sub_sub = fvl_el.find(
-                        f"{{urn:Rockwell/MasterRecipe}}{suffix}", namespaces=ns
-                    )
-                    if sub_sub is None:
-                        sub_sub = etree.SubElement(
-                            fvl_el, f"{{urn:Rockwell/MasterRecipe}}{suffix}"
-                        )
-                    sub_sub.text = v
+        # Append FormulaValueLimit to FormulaValue
+        new_el.append(fvl_el)
 
 
 def update_parameter_or_formulavalue(node_info, row_dict, filepath, stats):
