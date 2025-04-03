@@ -17,15 +17,19 @@ DEFAULT_COLUMN_ORDER = [
     "FullPath",
     "TagType",
     "Name",
+    "ERPAlias",
+    "Display"
+    "PLCReference",
     "Real",
     "Integer",  # If you use that in your real schema
     "String",
     "Defer",
-    "Low",
     "High",
+    "Low",
     "EnumerationSet",
     "EnumerationMember",
     "EngineeringUnits",
+    "Scale",
     "FormulaValueLimit_Verification",
     "FormulaValueLimit_LowLowLowValue",
     "FormulaValueLimit_LowLowValue",
@@ -285,6 +289,57 @@ def extract_single_formulavalue(fv_el, recipe_id, parent_path):
 # ----------------------------------------------------------------------
 
 
+# def command_xml2excel(parent_xml, excel_path):
+#     logger.info(f"Starting xml2excel: parent={parent_xml} -> {excel_path}")
+#     if not os.path.isfile(parent_xml):
+#         logger.error(f"File not found: {parent_xml}")
+#         sys.exit(1)
+
+#     visited = set()
+#     all_params = {}  # file->list of row-dicts
+#     stats = {"parsed_count": 0}
+#     load_and_recurse_xml(parent_xml, visited, all_params, stats)
+
+#     logger.info(
+#         f"Found total {stats['parsed_count']} parameters/formulas across {len(all_params)} file(s)."
+#     )
+
+#     wb = Workbook()
+#     # remove default
+#     if "Sheet" in wb.sheetnames:
+#         wb.remove(wb["Sheet"])
+
+#     for filename, rows in all_params.items():
+#         short_name = os.path.splitext(os.path.basename(filename))[0]
+#         ws = wb.create_sheet(title=short_name[:31])
+
+#         # Gather all columns
+#         all_cols = set()
+#         for r in rows:
+#             for k in r:
+#                 all_cols.add(k)
+
+#         # Convert to a list, reorder using DEFAULT_COLUMN_ORDER
+#         all_cols_list = list(all_cols)
+#         ordered_cols = []
+#         # (1) Add in default columns in the specified order
+#         for col in DEFAULT_COLUMN_ORDER:
+#             if col in all_cols_list:
+#                 ordered_cols.append(col)
+#                 all_cols_list.remove(col)
+#         # (2) Append leftover columns in alphabetical order
+#         all_cols_list.sort()
+#         ordered_cols.extend(all_cols_list)
+
+#         ws.append(ordered_cols)
+#         for row_dict in rows:
+#             row_values = [row_dict.get(col, "") for col in ordered_cols]
+#             ws.append(row_values)
+
+#     wb.save(excel_path)
+#     logger.info("xml2excel complete. Workbook saved.")
+
+
 def command_xml2excel(parent_xml, excel_path):
     logger.info(f"Starting xml2excel: parent={parent_xml} -> {excel_path}")
     if not os.path.isfile(parent_xml):
@@ -309,23 +364,18 @@ def command_xml2excel(parent_xml, excel_path):
         short_name = os.path.splitext(os.path.basename(filename))[0]
         ws = wb.create_sheet(title=short_name[:31])
 
-        # Gather all columns
-        all_cols = set()
-        for r in rows:
-            for k in r:
-                all_cols.add(k)
-
-        # Convert to a list, reorder using DEFAULT_COLUMN_ORDER
-        all_cols_list = list(all_cols)
+        if not rows:
+            continue
+        
+        # Maintain XML column order dynamically
         ordered_cols = []
-        # (1) Add in default columns in the specified order
-        for col in DEFAULT_COLUMN_ORDER:
-            if col in all_cols_list:
-                ordered_cols.append(col)
-                all_cols_list.remove(col)
-        # (2) Append leftover columns in alphabetical order
-        all_cols_list.sort()
-        ordered_cols.extend(all_cols_list)
+        seen_cols = set()
+        
+        for row in rows:
+            for col in row.keys():
+                if col not in seen_cols:
+                    ordered_cols.append(col)
+                    seen_cols.add(col)
 
         ws.append(ordered_cols)
         for row_dict in rows:
@@ -334,6 +384,8 @@ def command_xml2excel(parent_xml, excel_path):
 
     wb.save(excel_path)
     logger.info("xml2excel complete. Workbook saved.")
+
+
 
 
 # ----------------------------------------------------------------------
@@ -522,41 +574,91 @@ def create_parameter_or_formulavalue(row_dict, filepath, tree, node_info, stats)
     last_part = parts[-1]
     middle = parts[1:-1]
 
+    # Lists to store new elements
+    new_parameters = []
+    new_formula_values = []
+
     if last_part.startswith("Parameter["):
+        # Create new parameter element
         new_el = etree.Element("{urn:Rockwell/MasterRecipe}Parameter")
         nm_el = etree.SubElement(new_el, "{urn:Rockwell/MasterRecipe}Name")
         nm_el.text = row_dict.get("Name", "")
-        # fill sub elements (only if non blank)
+
+        # Ensure ERPAlias is always created
+        erpalias_el = etree.SubElement(new_el, "{urn:Rockwell/MasterRecipe}ERPAlias")
+        erpalias_el.text = row_dict.get("ERPAlias", "").strip() or None  # Ensures empty tag if not present
+
+        # Track if a numerical tag exists
+        has_numeric_type = False
+        low_el = None  # Placeholder for <Low> element
+
+        # Fill sub-elements (only if non-blank)
         created_sub_count = 0
         for k, v in row_dict.items():
-            if k in ("FullPath", "TagType", "Name"):
+            if k in ("FullPath", "TagType", "Name", "ERPAlias"):  # ERPAlias is already handled separately
                 continue
             if k.startswith("FormulaValueLimit_"):
                 continue
-            if v.strip() == "":
-                # user gave blank => skip creation
+            if v.strip() == "":  # Skip blank values
                 continue
+            
             sub_el = etree.SubElement(new_el, f"{{urn:Rockwell/MasterRecipe}}{k}")
             sub_el.text = v
             created_sub_count += 1
-        root.append(new_el)
+
+            # Track <Integer>, <String>, or <Real>
+            if k in ("Integer", "String", "Real"):
+                has_numeric_type = True
+            
+            # Track the <Low> element to insert <EngineeringUnits> after it
+            if k == "Low":
+                low_el = sub_el
+
+        # Ensure <EngineeringUnits/> after <Low> if an Integer, String, or Real exists
+        if has_numeric_type and low_el is not None:
+            eng_units_el = etree.Element("{urn:Rockwell/MasterRecipe}EngineeringUnits")
+            new_el.insert(new_el.index(low_el) + 1, eng_units_el)
+
+        new_parameters.append(new_el)
         stats["created_count"] += 1
         logger.debug(f"Created Parameter with {created_sub_count} sub-elements: {fp}")
 
     elif last_part.startswith("FormulaValue["):
+        # Locate step for FormulaValue
         step_el = locate_step_in_dom(root, middle)
         if step_el is None:
             logger.warning(f"Cannot locate step for {fp}, skipping create.")
             return
+
+        # Create new formula value element
         new_el = etree.Element("{urn:Rockwell/MasterRecipe}FormulaValue")
         nm_el = etree.SubElement(new_el, "{urn:Rockwell/MasterRecipe}Name")
         nm_el.text = row_dict.get("Name", "")
         apply_formulavalue_updates(new_el, row_dict, original_info=None)
-        step_el.append(new_el)
+        new_formula_values.append(new_el)
         stats["created_count"] += 1
         logger.debug(f"Created FormulaValue: {fp}")
     else:
         logger.warning(f"Unrecognized path => {fp}")
+
+    # Reorder elements in the tree
+    # Find the last Parameter element in the tree
+    last_param_el = None
+    for param in root.iter("{urn:Rockwell/MasterRecipe}Parameter"):
+        last_param_el = param  # Keep track of the last Parameter
+
+    if new_parameters:
+        if last_param_el is not None:
+            # Insert the new parameter right after the last existing one
+            root.insert(root.index(last_param_el) + 1, new_parameters[0])
+        else:
+            # If no parameter exists, just append the new parameter
+            root.append(new_parameters[0])
+
+    # Append all formula values after parameters
+    for formula in new_formula_values:
+        root.append(formula)
+
 
 
 def apply_formulavalue_updates(fv_element, row_dict, original_info):
