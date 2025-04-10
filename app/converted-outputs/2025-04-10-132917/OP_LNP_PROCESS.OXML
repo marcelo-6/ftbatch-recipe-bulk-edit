@@ -2874,4 +2874,4 @@
 	</UnitRequirement>
 	<Comments/>
 	<Formulations/>
-<FormulaValue><Name>X_R_COLLECT_VALVE_COMMAND_00</Name><EnumerationSet>N_VLVCOMMAND</EnumerationSet><Display>false</Display><Defer>FLW1_COLLECT_VLV_CMD_01</Defer><FormulaValueLimit Verification="No_Limits"><LowLowLowValue>0.</LowLowLowValue><LowLowValue>0.</LowLowValue><LowValue>0.</LowValue><HighValue>0.</HighValue><HighHighValue>0.</HighHighValue><HighHighHighValue>0.</HighHighHighValue></FormulaValueLimit></FormulaValue></RecipeElement>
+</RecipeElement>

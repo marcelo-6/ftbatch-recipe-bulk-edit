@@ -565,6 +565,101 @@ def locate_step_in_dom(root, middle_parts):
     return current
 
 
+# def create_parameter_or_formulavalue(row_dict, filepath, tree, node_info, stats):
+#     fp = row_dict.get("FullPath", "")
+#     logger.info(f"Creating node in {filepath}: {fp}")
+
+#     root = tree.getroot()
+#     parts = fp.split("/")
+#     last_part = parts[-1]
+#     middle = parts[1:-1]
+
+#     # Lists to store new elements
+#     new_parameters = []
+#     new_formula_values = []
+
+#     if last_part.startswith("Parameter["):
+#         # Create new parameter element
+#         new_el = etree.Element("{urn:Rockwell/MasterRecipe}Parameter")
+#         nm_el = etree.SubElement(new_el, "{urn:Rockwell/MasterRecipe}Name")
+#         nm_el.text = row_dict.get("Name", "")
+
+#         # Ensure ERPAlias is always created
+#         erpalias_el = etree.SubElement(new_el, "{urn:Rockwell/MasterRecipe}ERPAlias")
+#         erpalias_el.text = row_dict.get("ERPAlias", "").strip() or None  # Ensures empty tag if not present
+
+#         # Track if a numerical tag exists
+#         has_numeric_type = False
+#         low_el = None  # Placeholder for <Low> element
+
+#         # Fill sub-elements (only if non-blank)
+#         created_sub_count = 0
+#         for k, v in row_dict.items():
+#             if k in ("FullPath", "TagType", "Name", "ERPAlias"):  # ERPAlias is already handled separately
+#                 continue
+#             if k.startswith("FormulaValueLimit_"):
+#                 continue
+#             if v.strip() == "":  # Skip blank values
+#                 continue
+            
+#             sub_el = etree.SubElement(new_el, f"{{urn:Rockwell/MasterRecipe}}{k}")
+#             sub_el.text = v
+#             created_sub_count += 1
+
+#             # Track <Integer>, <String>, or <Real>
+#             if k in ("Integer", "String", "Real"):
+#                 has_numeric_type = True
+            
+#             # Track the <Low> element to insert <EngineeringUnits> after it
+#             if k == "Low":
+#                 low_el = sub_el
+
+#         # Ensure <EngineeringUnits/> after <Low> if an Integer, String, or Real exists
+#         if has_numeric_type and low_el is not None:
+#             eng_units_el = etree.Element("{urn:Rockwell/MasterRecipe}EngineeringUnits")
+#             new_el.insert(new_el.index(low_el) + 1, eng_units_el)
+
+#         new_parameters.append(new_el)
+#         stats["created_count"] += 1
+#         logger.debug(f"Created Parameter with {created_sub_count} sub-elements: {fp}")
+
+#     elif last_part.startswith("FormulaValue["):
+#         # Locate step for FormulaValue
+#         step_el = locate_step_in_dom(root, middle)
+#         if step_el is None:
+#             logger.warning(f"Cannot locate step for {fp}, skipping create.")
+#             return
+
+#         # Create new formula value element
+#         new_el = etree.Element("{urn:Rockwell/MasterRecipe}FormulaValue")
+#         nm_el = etree.SubElement(new_el, "{urn:Rockwell/MasterRecipe}Name")
+#         nm_el.text = row_dict.get("Name", "")
+#         apply_formulavalue_updates(new_el, row_dict, original_info=None)
+#         new_formula_values.append(new_el)
+#         stats["created_count"] += 1
+#         logger.debug(f"Created FormulaValue: {fp}")
+#     else:
+#         logger.warning(f"Unrecognized path => {fp}")
+
+#     # Reorder elements in the tree
+#     # Find the last Parameter element in the tree
+#     last_param_el = None
+#     for param in root.iter("{urn:Rockwell/MasterRecipe}Parameter"):
+#         last_param_el = param  # Keep track of the last Parameter
+
+#     if new_parameters:
+#         if last_param_el is not None:
+#             # Insert the new parameter right after the last existing one
+#             root.insert(root.index(last_param_el) + 1, new_parameters[0])
+#         else:
+#             # If no parameter exists, just append the new parameter
+#             root.append(new_parameters[0])
+
+#     # Append all formula values after parameters
+#     for formula in new_formula_values:
+#         root.append(formula)
+
+
 def create_parameter_or_formulavalue(row_dict, filepath, tree, node_info, stats):
     fp = row_dict.get("FullPath", "")
     logger.info(f"Creating node in {filepath}: {fp}")
@@ -572,92 +667,104 @@ def create_parameter_or_formulavalue(row_dict, filepath, tree, node_info, stats)
     root = tree.getroot()
     parts = fp.split("/")
     last_part = parts[-1]
-    middle = parts[1:-1]
-
-    # Lists to store new elements
-    new_parameters = []
-    new_formula_values = []
+    middle = parts[1:-1]  # Used for locating parent step for FormulaValue
 
     if last_part.startswith("Parameter["):
-        # Create new parameter element
+        # Create new Parameter element
         new_el = etree.Element("{urn:Rockwell/MasterRecipe}Parameter")
-        nm_el = etree.SubElement(new_el, "{urn:Rockwell/MasterRecipe}Name")
-        nm_el.text = row_dict.get("Name", "")
 
-        # Ensure ERPAlias is always created
+        # Name (required)
+        name_el = etree.SubElement(new_el, "{urn:Rockwell/MasterRecipe}Name")
+        name_el.text = row_dict.get("Name", "")
+
+        # ERPAlias (always created, even if blank)
         erpalias_el = etree.SubElement(new_el, "{urn:Rockwell/MasterRecipe}ERPAlias")
-        erpalias_el.text = row_dict.get("ERPAlias", "").strip() or None  # Ensures empty tag if not present
+        erpalias_el.text = row_dict.get("ERPAlias", "").strip() or None
 
-        # Track if a numerical tag exists
+        # Flags
         has_numeric_type = False
-        low_el = None  # Placeholder for <Low> element
-
-        # Fill sub-elements (only if non-blank)
+        low_el = None
         created_sub_count = 0
+
         for k, v in row_dict.items():
-            if k in ("FullPath", "TagType", "Name", "ERPAlias"):  # ERPAlias is already handled separately
+            if k in ("FullPath", "TagType", "Name", "ERPAlias"):
                 continue
-            if k.startswith("FormulaValueLimit_"):
+            if k.startswith("FormulaValueLimit_") or not v.strip():
                 continue
-            if v.strip() == "":  # Skip blank values
-                continue
-            
+
             sub_el = etree.SubElement(new_el, f"{{urn:Rockwell/MasterRecipe}}{k}")
             sub_el.text = v
             created_sub_count += 1
 
-            # Track <Integer>, <String>, or <Real>
             if k in ("Integer", "String", "Real"):
                 has_numeric_type = True
-            
-            # Track the <Low> element to insert <EngineeringUnits> after it
             if k == "Low":
                 low_el = sub_el
 
-        # Ensure <EngineeringUnits/> after <Low> if an Integer, String, or Real exists
-        if has_numeric_type and low_el is not None:
-            eng_units_el = etree.Element("{urn:Rockwell/MasterRecipe}EngineeringUnits")
-            new_el.insert(new_el.index(low_el) + 1, eng_units_el)
+        # if has_numeric_type and low_el is not None:
+        #     eng_units_el = etree.Element("{urn:Rockwell/MasterRecipe}EngineeringUnits")
+        #     new_el.insert(new_el.index(low_el) + 1, eng_units_el)
 
-        new_parameters.append(new_el)
+        if has_numeric_type:
+            eng_units_el = etree.Element("{urn:Rockwell/MasterRecipe}EngineeringUnits")
+            if low_el is not None:
+                new_el.insert(new_el.index(low_el) + 1, eng_units_el)
+            else:
+                new_el.append(eng_units_el)
+
+        last_param_el = None
+        for param in root.iter("{urn:Rockwell/MasterRecipe}Parameter"):
+            last_param_el = param
+
+        if last_param_el is not None:
+            root.insert(root.index(last_param_el) + 1, new_el)
+        else:
+            root.append(new_el)
+
         stats["created_count"] += 1
         logger.debug(f"Created Parameter with {created_sub_count} sub-elements: {fp}")
 
     elif last_part.startswith("FormulaValue["):
-        # Locate step for FormulaValue
         step_el = locate_step_in_dom(root, middle)
         if step_el is None:
             logger.warning(f"Cannot locate step for {fp}, skipping create.")
             return
 
-        # Create new formula value element
+        # Create FormulaValue element
         new_el = etree.Element("{urn:Rockwell/MasterRecipe}FormulaValue")
-        nm_el = etree.SubElement(new_el, "{urn:Rockwell/MasterRecipe}Name")
-        nm_el.text = row_dict.get("Name", "")
-        apply_formulavalue_updates(new_el, row_dict, original_info=None)
-        new_formula_values.append(new_el)
+
+        # Preferred order of child tags
+        preferred_order = [
+            "Name",
+            "Display",
+            "Defer",
+            "EnumerationSet",
+            "EnumerationMember"
+        ]
+
+        # Create elements in preferred order
+        for tag in preferred_order:
+            value = row_dict.get(tag, "").strip()
+            sub_el = etree.SubElement(new_el, f"{{urn:Rockwell/MasterRecipe}}{tag}")
+            if value:
+                sub_el.text = value
+
+        # Add any additional fields not in preferred order
+        for k, v in row_dict.items():
+            if k in ("FullPath", "TagType") or k in preferred_order or not v.strip():
+                continue
+            sub_el = etree.SubElement(new_el, f"{{urn:Rockwell/MasterRecipe}}{k}")
+            sub_el.text = v
+
+        # Append to step
+        step_el.append(new_el)
+
         stats["created_count"] += 1
-        logger.debug(f"Created FormulaValue: {fp}")
+        logger.debug(f"Created FormulaValue inside step: {fp}")
+
     else:
         logger.warning(f"Unrecognized path => {fp}")
 
-    # Reorder elements in the tree
-    # Find the last Parameter element in the tree
-    last_param_el = None
-    for param in root.iter("{urn:Rockwell/MasterRecipe}Parameter"):
-        last_param_el = param  # Keep track of the last Parameter
-
-    if new_parameters:
-        if last_param_el is not None:
-            # Insert the new parameter right after the last existing one
-            root.insert(root.index(last_param_el) + 1, new_parameters[0])
-        else:
-            # If no parameter exists, just append the new parameter
-            root.append(new_parameters[0])
-
-    # Append all formula values after parameters
-    for formula in new_formula_values:
-        root.append(formula)
 
 
 
