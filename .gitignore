@@ -11,6 +11,7 @@ tests/examples/converted-outputs*/*
 tests/examples/excel_test.xlsx
 
 # Distribution / packaging
+!dist/FTBatchBulkEditor.exe
 .Python
 build/
 develop-eggs/
