@@ -11,11 +11,11 @@ tests/examples/converted-outputs*/*
 tests/examples/excel_test.xlsx
 
 # Distribution / packaging
-!app/dist/*.exe
 .Python
 build/
 develop-eggs/
-dist/
+dist/*
+!dist/batch_bulk_editor.exe
 downloads/
 eggs/
 .eggs/
