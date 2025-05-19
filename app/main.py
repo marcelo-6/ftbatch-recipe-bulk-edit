@@ -932,9 +932,7 @@ def command_excel2xml(parent_xml, excel_path):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description=pyproject_data["project"]["description"]
-    )
+    parser = argparse.ArgumentParser(description="FactoryTalk Batch Bulk Editor")
 
     sub = parser.add_subparsers(dest="command", help="Sub-command")
 
@@ -973,11 +971,6 @@ def main():
         command_excel2xml(args.xml, args.excel)
     else:
         parser.print_help()
-
-    logger.debug(
-        f"{pyproject_data['project']['name']} Version {pyproject_data['project']['version']}"
-    )
-    logger.debug(f"Logger Level: {logger.getEffectiveLevel()}")
 
 
 if __name__ == "__main__":
