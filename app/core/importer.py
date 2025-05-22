@@ -17,7 +17,17 @@ class ExcelImporter:
 
     def import_changes(self, excel_path: str, trees: list) -> dict:
         """
-        Read the Excel file, apply create/update/delete operations to each RecipeTree.
+        Read an edited Excel workbook and apply create/update/delete operations to the RecipeTree models.
+
+        This method opens the given `.xlsx` file and matches each sheet by filename to its
+        corresponding RecipeTree.  It then iterates every data row, enforcing that exactly one
+        data-type column is populated and that any `Defer` references exist in the same shee's
+        parameter names.  Rows for existing nodes invoke `update_from_dict()`, while new rows
+        invoke `create_parameter()` or `create_formulavalue()`.  After processing all rows, it
+        removes any XML nodes that were not seen in Excel, counting them as deleted.  If any
+        validation errors occur (e.g. missing defer target or type conflicts), it logs each as
+        ERROR and raises a single `ValidationError` summarizing them.  A dict of counts
+        (`created`, `updated`, `deleted`) is returned on success.
 
         Args:
             excel_path: Path to the edited Excel workbook.

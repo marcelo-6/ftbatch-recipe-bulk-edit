@@ -15,7 +15,15 @@ class XMLParser:
 
     def parse(self, parent_path: str) -> list:
         """
-        Load parent and children, returning list of RecipeTree.
+        Recursively load a parent XML recipe and all of its child recipe files into RecipeTree objects.
+
+        This method begins by loading the parent `.pxml` (or `.uxml`) file, creating a RecipeTree
+        instance that captures its parameters and formula values.  It then inspects every
+        `<StepRecipeID>` element to discover child files (e.g. `.uxml` or `.oxml`) in the same directory,
+        loading each of those exactly once.  For each load, it logs an INFO line indicating how many
+        parameters and formula values were extracted.  If a referenced child file is missing, it emits
+        a warning but continues processing.  Finally, it returns a list of all distinct RecipeTree
+        objects (parent plus children), preserving the original loading order.
         """
         loaded = {}
         log = logging.getLogger(__name__)

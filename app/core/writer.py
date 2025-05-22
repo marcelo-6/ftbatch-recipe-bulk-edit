@@ -14,7 +14,14 @@ class XMLWriter:
 
     def write(self, trees: list, base_dir: str = None) -> str:
         """
-        Serialize each RecipeTree to its XML file under a new timestamped sub-folder.
+        Serialize all modified RecipeTree objects back to XML files in a timestamped subfolder.
+
+        This method determines an output root (either `base_dir` or a `converted-outputs` folder
+        alongside the first XML), creates a timestamped directory (YYYY-MM-DD-HHMM), and writes
+        each RecipeTree's updated `.tree` to a file of the same name.  Before writing, it calls
+        each node's `reorder_children()` to ensure canonical tag order.  The XML is emitted with
+        `utf-8` encoding, an XML declaration, and pretty-printed indentation.  Finally, it returns
+        the full path of the created output directory for downstream use or user notification.
 
         Args:
             trees: List of RecipeTree with modifications applied.

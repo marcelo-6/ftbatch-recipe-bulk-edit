@@ -61,6 +61,18 @@ class ParameterNode(NodeBase):
         return row
 
     def update_from_dict(self, row: dict):
+        """
+        Apply updates to this <Parameter> element based on a single Excel row.
+
+        First, it validates that the row has exactly one data-type column (Real, Integer, String,
+        or EnumerationSet), raising `TypeConflictError` otherwise.  Then, for each field in the row,
+        it skips TagType/FullPath/Defer and any blank-and-nonexistent sub-elements, creating or
+        updating child tags to match the new values.  After setting text on each sub-element,
+        it invokes `reorder_children()` to enforce the canonical XML tag sequence.  Any unexpected
+        missing type or sub-element will raise `ValidationError` during reordering.  This
+        encapsulates all in-memory changes to the original XML tree.
+        """
+
         type_fields = ["Real", "Integer", "String", "EnumerationSet"]
         count = sum(bool(row[f].strip()) for f in type_fields)
         if count > 2:
@@ -153,6 +165,20 @@ class FormulaValueNode(NodeBase):
         return row
 
     def update_from_dict(self, row: dict):
+        """
+        Apply updates to this <FormulaValue> element based on a single Excel row.
+
+        It first validates that exactly one of Real, Integer, String, or EnumerationSet is
+        provided, raising `TypeConflictError` if not.  It then processes each field, skipping any
+        FormulaValueLimit data (handled separately) and TagType/FullPath.  For `Value` vs
+        `Defer`, it omits the `Value` tag when `Defer` is set, and vice versa.  It creates or
+        updates child elements to match the Excel values, preserving existing text where the
+        Excel cell is blank but the node existed.  After all sub-elements and the optional
+        `<FormulaValueLimit>` have been updated, it invokes `reorder_children()` to restore
+        deterministic ordering.  Any failure to find a referenced Step or attribute raises
+        `ValidationError` or `DeferResolutionError`.
+        """
+
         type_fields = ["Real", "Integer", "String", "EnumerationSet", "Defer"]
         count = sum(bool(row[f].strip()) for f in type_fields)
         if count > 2:
@@ -171,19 +197,38 @@ class FormulaValueNode(NodeBase):
             if el is None:
                 el = etree.SubElement(self.element, f"{{{NAMESPACE}}}{k}")
             el.text = text
-        # Assume FVL update logic as before...
+
         self.reorder_children()
 
     def reorder_children(self):
+        """
+        Reorder this <FormulaValue> element's children to the canonical S88 Batch layout.
+
+        The sequence enforced is: Name, Display, either Defer or Value, the single data-type
+        element (Integer, Real, String, or EnumerationSet), the optional EnumerationMember,
+        EngineeringUnits, and finally the `<FormulaValueLimit>` block (if present).  It first
+        builds a map of existing child elements by localname, removes all from the parent, and
+        then reattaches them in the specified order—creating empty placeholders for any
+        required tags that were missing.  This guarantees that even after updates or creations,
+        the resulting XML files are schema-compliant and machine-diff-friendly.  Missing
+        required children raise `ValidationError`.
+        """
+
         children = {QName(c.tag).localname: c for c in self.element}
         has_defer = "Defer" in children
         order = ["Name", "Display"] + (["Defer"] if has_defer else ["Value"])
         for t in ("Integer", "Real", "String", "EnumerationSet"):
             if t in children:
+                dtype = t
                 order.append(t)
+
         if "EnumerationMember" in children:
             order.append("EnumerationMember")
-        order.extend(["EngineeringUnits", "FormulaValueLimit"])
+        if dtype in ("Integer", "Real"):
+            order.append("EngineeringUnits")
+        if "FormulaValueLimit" in children:
+            order.append("FormulaValueLimit")
+        # order.extend(["EngineeringUnits", "FormulaValueLimit"])
         for c in list(self.element):
             self.element.remove(c)
         for tag in order:
