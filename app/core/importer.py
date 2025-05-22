@@ -1,0 +1,110 @@
+"""
+ExcelImporter: apply changes from an Excel workbook into RecipeTree models.
+"""
+
+import os
+import logging
+from openpyxl import load_workbook
+from core.base import EXCEL_COLUMNS, NAMESPACE, NSMAP
+from utils.errors import ValidationError
+from core.xml_model import RecipeTree, ParameterNode, FormulaValueNode
+
+
+class ExcelImporter:
+    """
+    Import changes from Excel workbook into RecipeTree instances.
+    """
+
+    def import_changes(self, excel_path: str, trees: list) -> dict:
+        """
+        Read the Excel file, apply create/update/delete operations to each RecipeTree.
+
+        Args:
+            excel_path: Path to the edited Excel workbook.
+            trees: List of RecipeTree loaded via XMLParser.parse().
+
+        Returns:
+            stats: Dict with counts: {'created': int, 'updated': int, 'deleted': int}
+
+        Raises:
+            ValidationError: Aggregated validation errors found in Excel rows.
+        """
+        log = logging.getLogger(__name__)
+        wb = load_workbook(excel_path)
+        errors = []
+        stats = {"created": 0, "updated": 0, "deleted": 0}
+
+        # Map sheet name to RecipeTree by basename
+        tree_map = {os.path.basename(t.filepath): t for t in trees}
+
+        for sheet in wb.sheetnames:
+            if sheet not in tree_map:
+                log.warning("No matching XML for sheet '%s', skipping", sheet)
+                continue
+            tree = tree_map[sheet]
+            ws = wb[sheet]
+            header = [c.value for c in next(ws.iter_rows(min_row=1, max_row=1))]
+
+            seen_params = set()
+            seen_fvs = set()
+
+            for r_idx, row in enumerate(
+                ws.iter_rows(min_row=2, values_only=True), start=2
+            ):
+                row_dict = dict(zip(header, [v if v is not None else "" for v in row]))
+                fp = row_dict.get("FullPath", "").strip()
+                tagtype = row_dict.get("TagType", "").strip()
+
+                # Validate single-type
+                types = ["Real", "Integer", "String", "EnumerationSet"]
+                cnt = sum(bool(row_dict.get(t).strip()) for t in types)
+                if cnt != 1:
+                    errors.append(
+                        f"{sheet}!Row{r_idx}: expected exactly one data type for {fp}"
+                    )
+                    continue
+
+                if tagtype == "Parameter":
+                    node = tree.find_parameter(fp)
+                    if node:
+                        node.update_from_dict(row_dict)
+                        stats["updated"] += 1
+                    else:
+                        tree.create_parameter(row_dict)
+                        stats["created"] += 1
+                    seen_params.add(fp)
+
+                elif tagtype == "FormulaValue":
+                    node = tree.find_formulavalue(fp)
+                    defer = row_dict.get("Defer", "").strip()
+                    if defer and not tree.has_parameter_named(defer):
+                        errors.append(
+                            f"{sheet}!Row{r_idx}: defer target '{defer}' not found for {fp}"
+                        )
+                        continue
+                    if node:
+                        node.update_from_dict(row_dict)
+                        stats["updated"] += 1
+                    else:
+                        tree.create_formulavalue(row_dict)
+                        stats["created"] += 1
+                    seen_fvs.add(fp)
+                else:
+                    errors.append(f"{sheet}!Row{r_idx}: unknown TagType '{tagtype}'")
+                    continue
+
+            # Deletes
+            for node in list(tree.parameters):
+                if node.fullpath not in seen_params:
+                    node.element.getparent().remove(node.element)
+                    tree.parameters.remove(node)
+                    stats["deleted"] += 1
+            for node in list(tree.formula_values):
+                if node.fullpath not in seen_fvs:
+                    node.element.getparent().remove(node.element)
+                    tree.formula_values.remove(node)
+                    stats["deleted"] += 1
+
+        if errors:
+            raise ValidationError("\\n".join(errors))
+        return stats
