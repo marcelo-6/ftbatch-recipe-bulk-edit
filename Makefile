@@ -10,7 +10,7 @@ PKG_VERSION := $(shell uv run python3 -c "import toml; print(toml.load('$(PYPROJ
 BUILD_DIR   := bundle-$(PKG_NAME)
 ZIPFILE     := $(PKG_NAME)-$(PKG_VERSION)-source.zip
 
-.PHONY: help all check-uv install meta version build clean
+.PHONY: help all check-uv install meta version build clean test
 
 help:
 	@echo "Usage: make [target]"
@@ -31,6 +31,9 @@ help:
 	@echo "  make version       # generate version_info.txt"
 	@echo "  make clean         # wipe all artifacts"
 
+test:
+	@echo "Starting Pytests"
+	pytest --disable-warnings -q
 
 .ONESHELL:
 
