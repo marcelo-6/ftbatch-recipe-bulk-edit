@@ -9,6 +9,7 @@ __pycache__/
 # folders
 tests/examples/converted-outputs*/*
 tests/examples/excel_test.xlsx
+tests/examples/full_recipe/*
 .vscode*
 
 # Distribution / packaging
