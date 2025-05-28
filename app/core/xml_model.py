@@ -6,6 +6,7 @@ XML model: RecipeTree, ParameterNode, FormulaValueNode.
 
 import os
 import re
+import logging
 from lxml import etree
 from lxml.etree import QName
 from core.base import NAMESPACE, NSMAP, EXCEL_COLUMNS
@@ -25,6 +26,7 @@ class NodeBase:
         self.original_subs = {
             QName(child.tag).localname: (child.text or "") for child in element
         }
+        self.log = logging.getLogger(__name__)
 
     def to_excel_row(self) -> dict:
         raise NotImplementedError
@@ -58,6 +60,7 @@ class ParameterNode(NodeBase):
         for k, v in self.original_subs.items():
             if k not in row:
                 row[k] = v
+        self.log.debug(f"{row}")
         return row
 
     def update_from_dict(self, row: dict):
@@ -77,11 +80,13 @@ class ParameterNode(NodeBase):
         count = sum(bool(row[f].strip()) for f in type_fields)
         if count > 2:
             raise TypeConflictError(f"{self.fullpath}: must have exactly one data type")
+        self.log.debug(f"\t\tParsing excel row...")
         for k, new_val in row.items():
             if k in ("TagType", "FullPath", "Defer") or k.startswith(
                 "FormulaValueLimit_"
             ):
                 continue
+            self.log.debug(f"\t\t{k}={new_val}")
             text = new_val.strip()
             if not text and k not in self.original_subs:
                 continue
@@ -162,6 +167,7 @@ class FormulaValueNode(NodeBase):
         for k, v in self.original_subs.items():
             if k not in row:
                 row[k] = v
+        self.log.debug(f"{row}")
         return row
 
     def update_from_dict(self, row: dict):
@@ -249,6 +255,7 @@ class RecipeTree:
         self.root = self.tree.getroot()
         self.parameters = []
         self.formula_values = []
+        self.log = logging.getLogger(__name__)
 
     def extract_nodes(self):
         rid_el = self.root.find(f"{{{NAMESPACE}}}RecipeElementID", namespaces=NSMAP)
@@ -256,6 +263,7 @@ class RecipeTree:
         for p in self.root.findall(f"{{{NAMESPACE}}}Parameter", namespaces=NSMAP):
             name = p.find(f"{{{NAMESPACE}}}Name", namespaces=NSMAP).text or ""
             fp = f"{rid}/Parameter[{name}]"
+            self.log.debug(f"\t\tFound {fp}")
             self.parameters.append(ParameterNode(p, fp, self.filepath))
         for fv in self.root.findall(
             f".//{{{NAMESPACE}}}FormulaValue", namespaces=NSMAP
@@ -264,6 +272,7 @@ class RecipeTree:
             step_name = step.find(f"{{{NAMESPACE}}}Name", namespaces=NSMAP).text or ""
             name = fv.find(f"{{{NAMESPACE}}}Name", namespaces=NSMAP).text or ""
             fp = f"{rid}/Steps/Step[{step_name}]/FormulaValue[{name}]"
+            self.log.debug(f"\t\tFound {fp}")
             self.formula_values.append(FormulaValueNode(fv, fp, self.filepath))
 
     def find_parameter(self, fullpath: str):

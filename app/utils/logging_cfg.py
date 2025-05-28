@@ -3,6 +3,7 @@ Configure logging: INFO->console, DEBUG->file.
 """
 
 import logging
+import logging.handlers
 
 
 def configure_logging(debug_mode: bool) -> None:
@@ -23,7 +24,13 @@ def configure_logging(debug_mode: bool) -> None:
     if debug_mode:
         logger.setLevel(logging.DEBUG)
         # File handler at DEBUG
-        fh = logging.FileHandler("batch_bulk_editor.log", mode="a", encoding="utf-8")
+        fh = logging.handlers.RotatingFileHandler(
+            "batch_bulk_editor.log",
+            mode="a",
+            maxBytes=20e6,
+            backupCount=10,
+            encoding="utf-8",
+        )
         fh.setLevel(logging.DEBUG)
         file_formatter = logging.Formatter(
             fmt="[%(asctime)s] %(levelname)s\t[%(name)s.%(funcName)s:%(lineno)d]\t%(message)s",

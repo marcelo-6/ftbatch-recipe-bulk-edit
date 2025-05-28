@@ -35,6 +35,7 @@ class XMLParser:
             tree = RecipeTree(path)
             tree.extract_nodes()
             loaded[path] = tree
+
             log.info(
                 f"Loaded {os.path.basename(path)}: {len(tree.parameters)} params, {len(tree.formula_values)} formula values, Total = {len(tree.parameters) + len(tree.formula_values)}"
             )
