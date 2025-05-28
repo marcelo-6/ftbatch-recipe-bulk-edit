@@ -5,6 +5,7 @@ ExcelImporter: apply changes from an Excel workbook into RecipeTree models.
 import os
 import logging
 from openpyxl import load_workbook
+from utils.string import safe_strip
 from core.base import EXCEL_COLUMNS, NAMESPACE, NSMAP
 from utils.errors import ValidationError
 from core.xml_model import RecipeTree, ParameterNode, FormulaValueNode
@@ -73,7 +74,7 @@ class ExcelImporter:
 
                 # Validate single-type
                 types = ["Real", "Integer", "String", "EnumerationSet", "Defer"]
-                cnt = sum(bool(row_dict.get(t).strip()) for t in types)
+                cnt = sum(bool(safe_strip(row_dict.get(t))) for t in types)
                 if cnt > 2:
                     log.error(
                         f"{sheet}!Row{r_idx}: expected exactly one data type for {fp}"

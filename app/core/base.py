@@ -18,6 +18,7 @@ EXCEL_COLUMNS = [
     "EnumerationSet",
     "EnumerationMember",
     "Defer",
+    "ParamExpression",
     # FVL columns
     "FormulaValueLimit_Verification",
     "FormulaValueLimit_LowLowLowValue",

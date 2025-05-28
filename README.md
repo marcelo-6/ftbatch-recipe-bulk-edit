@@ -51,6 +51,11 @@ A command-line tool (Python-based) that lets engineers bulk-edit Rockwell Factor
    - INFO-level messages to console.  
    - DEBUG-level (with `--debug`) to `batch_bulk_editor.log`.
 
+6. **ParamExpression support**
+   - For FormulaValues you can now supply a real‐time expression.
+   - In Excel, fill the appropriate data‐type column (Real/Integer/String) with the literal `ParamExpression`, and put the actual expression into the new **ParamExpression** column (appearing right after Defer).
+   - On import, the tool will generate a `<ParamExpression/>` tag, insert your formula into `<Real>` (or `<Integer>`, etc.), and preserve correct XML ordering.
+
 ---
 
 ## Requirements

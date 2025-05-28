@@ -171,9 +171,31 @@ class FormulaValueNode(NodeBase):
     def to_excel_row(self) -> dict:
         row = {"TagType": "FormulaValue", "Name": "", "FullPath": self.fullpath}
         row["Name"] = self.original_subs.get("Name", "")
+        # always include Defer
         defer = self.original_subs.get("Defer", "")
         row["Defer"] = defer
+        # default Value only when no defer
         row["Value"] = "" if defer else self.original_subs.get("Value", "")
+
+        # handle ParamExpression cases
+        expr_present = "ParamExpression" in self.original_subs
+        # find the true dtype (Real/Integer/String/Enum)
+        dtype = None
+        for t in ("Real", "Integer", "String", "EnumerationSet"):
+            if self.original_subs.get(t, "").strip():
+                dtype = t
+                break
+        # if this node had a ParamExpression tag, then
+        #   * the dtype-col holds the literal "ParamExpression"
+        #   * the new column carries the expression text from the dtype element
+        if expr_present and dtype:
+            row[dtype] = "ParamExpression"
+            row["ParamExpression"] = self.original_subs.get(dtype, "")
+        else:
+            # standard case: just emit the raw values
+            row["ParamExpression"] = ""
+            for t in ("Real", "Integer", "String", "EnumerationSet"):
+                row[t] = self.original_subs.get(t, "")
         for col in ("Real", "Integer", "String", "EnumerationSet", "EnumerationMember"):
             row[col] = self.original_subs.get(col, "")
         fvl = self.element.find(f"{{{NAMESPACE}}}FormulaValueLimit", namespaces=NSMAP)
@@ -213,13 +235,31 @@ class FormulaValueNode(NodeBase):
         """
         changed = False
 
+        # detect if user is setting up an expression
+        expr_text = safe_strip(row.get("ParamExpression", ""))
+        # check if one of the dtype‐columns is literally "ParamExpression"
+        expr_dtype = None
+        for t in ("Real", "Integer", "String"):
+            if safe_strip(row.get(t, "")) == "ParamExpression":
+                expr_dtype = t
+                break
+        if expr_dtype and not expr_text:
+            # blank expression not allowed
+            raise ValidationError(
+                f"{self.fullpath}: ParamExpression column must be non-blank when {expr_dtype}=ParamExpression"
+            )
+
         type_fields = ["Real", "Integer", "String", "EnumerationSet", "Defer"]
-        count = sum(bool(row[f].strip()) for f in type_fields)
+        count = sum(bool(safe_strip(row[f])) for f in type_fields)
         if count > 2:
             raise TypeConflictError(f"{self.fullpath}: must have exactly one data type")
         try:
             for k, new_val in row.items():
-                if k.startswith("FormulaValueLimit_") or k in ("TagType", "FullPath"):
+                if k.startswith("FormulaValueLimit_") or k in (
+                    "TagType",
+                    "FullPath",
+                    "ParamExpression",
+                ):
                     continue
                 text = safe_strip(new_val)
                 #  skip Value if Defer set, skip Defer if blank
@@ -227,7 +267,8 @@ class FormulaValueNode(NodeBase):
                     continue
                 if k == "Defer" and not text:
                     continue
-
+                if expr_dtype and k == expr_dtype:
+                    continue
                 # skip blanks that didn’t originally exist
                 if not text and k not in self.original_subs:
                     continue
@@ -241,6 +282,29 @@ class FormulaValueNode(NodeBase):
                     if text != old:
                         el.text = text
                         changed = True
+
+            # handle ParamExpression
+            if expr_dtype:
+                # ensure an empty <ParamExpression/> tag exists
+                expr_el = self.element.find(
+                    f"{{{NAMESPACE}}}ParamExpression", namespaces=NSMAP
+                )
+                if expr_el is None:
+                    expr_el = etree.SubElement(
+                        self.element, f"{{{NAMESPACE}}}ParamExpression"
+                    )
+                    changed = True
+                # now write the actual expression into the dtype element
+                dtype_el = self.element.find(
+                    f"{{{NAMESPACE}}}{expr_dtype}", namespaces=NSMAP
+                )
+                if dtype_el is None:
+                    dtype_el = etree.SubElement(
+                        self.element, f"{{{NAMESPACE}}}{expr_dtype}"
+                    )
+                if safe_strip(dtype_el.text) != expr_text:
+                    dtype_el.text = expr_text
+                    changed = True
             if changed:
                 self.reorder_children()
             return changed
@@ -264,7 +328,15 @@ class FormulaValueNode(NodeBase):
 
         children = {QName(c.tag).localname: c for c in self.element}
         has_defer = "Defer" in children
-        order = ["Name", "Display"] + (["Defer"] if has_defer else ["Value"])
+        has_expression = "ParamExpression" in children
+        order = ["Name", "Display"]
+        if has_defer:
+            order.append("Defer")
+        elif has_expression:
+            order.append("ParamExpression")
+        else:
+            order.append("Value")
+
         for t in ("Integer", "Real", "String", "EnumerationSet"):
             if t in children:
                 dtype = t
