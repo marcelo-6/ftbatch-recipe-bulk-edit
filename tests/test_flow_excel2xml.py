@@ -66,6 +66,11 @@ def sample_pxml(tmp_path):
     return str(p)
 
 
+def local_name(el):
+    """Strip namespace and return just the tag's local name."""
+    return el.tag.split("}", 1)[-1]
+
+
 def test_excel2xml_full_flow(sample_pxml, tmp_path):
     """
     End-to-end excel2xml workflow test.
@@ -149,6 +154,31 @@ def test_excel2xml_full_flow(sample_pxml, tmp_path):
     p3 = root.find("ns:Parameter[ns:Name='Param3']", namespaces=ns)
     assert p3 is not None
     assert p3.find("ns:Name", namespaces=ns).text == "Param3"
+
+    # ensure Param3 is inserted immediately after existing Parameters
+    children = list(root)
+
+    # helper:
+    def local(el):
+        return el.tag.split("}", 1)[-1]
+
+    # find indexes
+    param1_idx = next(
+        i
+        for i, el in enumerate(children)
+        if local(el) == "Parameter"
+        and el.find("ns:Name", namespaces=ns).text == "Param1"
+    )
+    param3_idx = next(
+        i
+        for i, el in enumerate(children)
+        if local(el) == "Parameter"
+        and el.find("ns:Name", namespaces=ns).text == "Param3"
+    )
+    steps_idx = next(i for i, el in enumerate(children) if local(el) == "Steps")
+
+    # Assert ordering
+    assert param1_idx < param3_idx < steps_idx
 
     # Cleanup
     shutil.rmtree(out_dir)

@@ -327,10 +327,35 @@ class RecipeTree:
         return any(p.original_subs.get("Name", "") == name for p in self.parameters)
 
     def create_parameter(self, row: dict):
-        el = etree.SubElement(self.root, f"{{{NAMESPACE}}}Parameter")
-        node = ParameterNode(el, row["FullPath"], self.filepath)
-        node.update_from_dict(row)
+        """
+        Create a new <Parameter> under the root, inserting it right after
+        any existing <Parameter> elements (or before <Steps> if none).
+        Returns the newly created ParameterNode.
+        """
+        # 1) Build a fresh <Parameter> element (empty)
+        new_el = etree.Element(f"{{{NAMESPACE}}}Parameter", nsmap=NSMAP)
+
+        # 2) Locate last existing <Parameter> under root
+        existing = list(
+            self.root.findall(f"{{{NAMESPACE}}}Parameter", namespaces=NSMAP)
+        )
+        if existing:
+            last = existing[-1]
+            self.root.insert(self.root.index(last) + 1, new_el)
+        else:
+            # if no <Parameter> found, insert before <Steps> if present
+            steps = self.root.find(f"{{{NAMESPACE}}}Steps", namespaces=NSMAP)
+            if steps is not None:
+                self.root.insert(self.root.index(steps), new_el)
+            else:
+                # fallback: append at end
+                self.root.append(new_el)
+
+        # 3) Wrap in our Node class, apply data, track it
+        node = ParameterNode(new_el, row["FullPath"], self.filepath)
+        changed = node.update_from_dict(row)  # always True on new
         self.parameters.append(node)
+        return node
 
     def create_formulavalue(self, row: dict):
         m = re.match(r".*/Steps/Step\[(.*?)\]/FormulaValue\[.*\]$", row["FullPath"])
