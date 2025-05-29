@@ -71,7 +71,7 @@ class ExcelImporter:
             sheet_stats = {
                 "Parameters": {"Created": 0, "Updated": 0, "Deleted": 0},
                 "FormulaValues": defaultdict(
-                    lambda: {"Created": 0, "Updated": 0, "Deleted": 0}
+                    lambda: {"Created": 0, "Updated": 0, "Deleted": 0, "Deferrals": 0}
                 ),
             }
             detailed[sheet] = sheet_stats
@@ -151,6 +151,8 @@ class ExcelImporter:
                             )
                             stats["Updated"] += 1
                             sheet_stats["FormulaValues"][step]["Updated"] += 1
+                            if defer:
+                                sheet_stats["FormulaValues"][step]["Deferrals"] += 1
                         else:
                             log.debug(
                                 f"\tFormulaValue found in XML (no change)"  # , updating data to: {row_dict=}"
@@ -162,6 +164,8 @@ class ExcelImporter:
                         )
                         stats["Created"] += 1
                         sheet_stats["FormulaValues"][step]["Created"] += 1
+                        if defer:
+                            sheet_stats["FormulaValues"][step]["Deferrals"] += 1
                     seen_fvs.add(fp)
                 else:
                     log.error(f"{sheet}!Row{r_idx}: unknown TagType '{tagtype}'")
@@ -206,7 +210,7 @@ class ExcelImporter:
             if any_sheet_changes:
                 log.info(f"\tChanges for '{sheet}'")
                 log.info(
-                    "Parameters → Created=%d, Updated=%d, Deleted=%d",
+                    "Parameters → Created=%d\tUpdated=%d\tDeleted=%d",
                     p["Created"],
                     p["Updated"],
                     p["Deleted"],
@@ -214,7 +218,12 @@ class ExcelImporter:
                 log.info("FormulaValues by step:")
                 for step, f in sheet_stats["FormulaValues"].items():
                     log.info(
-                        f"\t[{step}] Created={f["Created"]}, Updated={f["Updated"]}, Deleted={f["Deleted"]}"
+                        "\t[%s] Created=%d\tUpdated=%d\tOut of which %d are Deferrals\tDeleted=%d",
+                        step,
+                        f["Created"],
+                        f["Updated"],
+                        f["Deferrals"],
+                        f["Deleted"],
                     )
                 log.info("------------------------------------------------")
 
@@ -225,7 +234,7 @@ class ExcelImporter:
         log.info("-- Summary of changes made by excel2xml Tool ---")
         log.info("------------------------------------------------")
         log.info(
-            "Total → Created=%d, Updated=%d, Deleted=%d",
+            "Total → Created=%d\tUpdated=%d\tDeleted=%d",
             stats["Created"],
             stats["Updated"],
             stats["Deleted"],
