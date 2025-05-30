@@ -263,6 +263,10 @@ flowchart LR
 * **Create FormulaValueLimit** only if `FormulaValueLimit_*` columns are non-blank or it existed originally.
 * **Type Enforcement**: Exactly one of Real, Integer, String, or EnumerationSet per row.
 * **Defer Validation**: A `<FormulaValue>`’s `Defer` must match a parameter name in the same sheet.
+  * Example output:
+```bash
+[30-May-2025 14:49:35]  ERROR:  CP_GMP_PROCEDURE.PXML!Row924: defer target 'DSTFP_TEMP_PROC2_TEMP_STATE_CMD' not found for CP_GMP_PROCEDURE/Steps/Step[UP_DSTFP_PROCESS:1]/FormulaValue[TEMP_PROC2_TEMP_STATE_CMD]
+```
 
 ---
 
