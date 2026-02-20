@@ -14,7 +14,7 @@ A command-line tool (Python-based) that lets engineers bulk-edit Rockwell Factor
     - [Using pip](#using-pip)
     - [Using a Python Virtual Environment](#using-a-python-virtual-environment)
     - [Using uv as the Package Manager](#using-uv-as-the-package-manager)
-    - [Using the Makefile (Recommended)](#using-the-makefile-recommended)
+    - [Using the Justfile (Recommended)](#using-the-justfile-recommended)
   - [Usage Overview](#usage-overview)
     - [Export XML to Excel (`xml2excel`)](#export-xml-to-excel-xml2excel)
     - [Import Excel to XML (`excel2xml`)](#import-excel-to-xml-excel2xml)
@@ -60,9 +60,9 @@ A command-line tool (Python-based) that lets engineers bulk-edit Rockwell Factor
 
 ## Requirements
 
-- **Python 3.7+** (tested on 3.12)  
-- **lxml**  
-- **openpyxl**  
+- **Python 3.14 only**
+- **lxml**
+- **openpyxl**
 
 ---
 
@@ -80,7 +80,7 @@ A command-line tool (Python-based) that lets engineers bulk-edit Rockwell Factor
 3. **Run**:
 
    ```bash
-   python main.py xml2excel --xml yourRecipe.pxml --excel out.xlsx
+   python app/main.py xml2excel --xml yourRecipe.pxml --excel out.xlsx
    ```
 
 ### Using a Python Virtual Environment
@@ -100,32 +100,29 @@ A command-line tool (Python-based) that lets engineers bulk-edit Rockwell Factor
 4. Run:
 
    ```bash
-   python main.py xml2excel --xml yourRecipe.pxml --excel out.xlsx
+   python app/main.py xml2excel --xml yourRecipe.pxml --excel out.xlsx
    ```
 
 ### Using uv as the Package Manager
 
-If you’ve defined your dependencies in `pyproject.toml`:
-
 ```bash
-uv init
-uv install
-uv run python main.py xml2excel --xml yourRecipe.pxml --excel out.xlsx
+uv sync --python 3.14
+uv run python app/main.py xml2excel --xml yourRecipe.pxml --excel out.xlsx
 ```
 
-### Using the Makefile (Recommended)
+### Using the Justfile (Recommended)
 
-We provide a Makefile to automate all steps:
+We provide a `justfile` to automate setup, testing, linting, coverage, and executable builds:
 
 ```bash
-make help       # list targets
-make test       # runs pytests
-make all        # check-uv → install → meta → version → build → clean
-make install    # uv init + uv sync
-make meta       # print name/version/description
-make version    # generate Windows version_info.txt
-make build      # bundle source for Windows
-make clean      # remove build artifacts
+just help         # list recipes
+just sync         # install deps for Python 3.14
+just test         # run tests
+just lint         # run Ruff lint checks
+just cov          # run tests with coverage threshold
+just version-info # generate build/version_info.txt
+just build        # build one-file executable with PyInstaller
+just clean        # remove generated artifacts
 ```
 
 ---
@@ -135,7 +132,7 @@ make clean      # remove build artifacts
 ### Export XML to Excel (`xml2excel`)
 
 ```bash
-python main.py xml2excel --xml PATH_TO_XML --excel OUTPUT_XLSX [--debug]
+python app/main.py xml2excel --xml PATH_TO_XML --excel OUTPUT_XLSX [--debug]
 ```
 
 | Argument  | Description                                                                       |
@@ -147,7 +144,7 @@ python main.py xml2excel --xml PATH_TO_XML --excel OUTPUT_XLSX [--debug]
 ### Import Excel to XML (`excel2xml`)
 
 ```bash
-python main.py excel2xml --xml PATH_TO_XML --excel EDITED_XLSX [--debug]
+python app/main.py excel2xml --xml PATH_TO_XML --excel EDITED_XLSX [--debug]
 ```
 
 | Argument  | Description                                  |
@@ -163,7 +160,7 @@ python main.py excel2xml --xml PATH_TO_XML --excel EDITED_XLSX [--debug]
 Add `--debug` before the subcommand to capture detailed logs:
 
 ```bash
-python main.py --debug xml2excel --xml myRecipe.pxml --excel out.xlsx
+python app/main.py --debug xml2excel --xml myRecipe.pxml --excel out.xlsx
 ```
 
 * Creates/appends `batch_bulk_editor.log` at DEBUG level.
