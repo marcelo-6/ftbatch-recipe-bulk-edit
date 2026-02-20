@@ -44,9 +44,9 @@ class ExcelImporter:
 
         # Overall stats of total changes to xmls
         stats = {
-            "Created": 0,
-            "Updated": 0,
-            "Deleted": 0,
+            "created": 0,
+            "updated": 0,
+            "deleted": 0,
         }
 
         # detailed per‐sheet
@@ -109,7 +109,7 @@ class ExcelImporter:
                             log.debug(
                                 "\tParameter found in XML (updating)"  # updating data to: {row_dict=}"
                             )
-                            stats["Updated"] += 1
+                            stats["updated"] += 1
                             sheet_stats["Parameters"]["Updated"] += 1
                         else:
                             log.debug(
@@ -120,7 +120,7 @@ class ExcelImporter:
                         log.debug(
                             "\tParameter NOT found in XML (creating)"  # creating parameter with: {row_dict=}"
                         )
-                        stats["Created"] += 1
+                        stats["created"] += 1
                         sheet_stats["Parameters"]["Created"] += 1
                     seen_params.add(fp)
 
@@ -146,7 +146,7 @@ class ExcelImporter:
                             log.debug(
                                 "\tFormulaValue found in XML (updating)"  # , updating data to: {row_dict=}"
                             )
-                            stats["Updated"] += 1
+                            stats["updated"] += 1
                             sheet_stats["FormulaValues"][step]["Updated"] += 1
                             if defer:
                                 sheet_stats["FormulaValues"][step]["Deferrals"] += 1
@@ -159,7 +159,7 @@ class ExcelImporter:
                         log.debug(
                             "\tFormulaValue NOT found in XML (creating)"  # , creating with: {row_dict=}"
                         )
-                        stats["Created"] += 1
+                        stats["created"] += 1
                         sheet_stats["FormulaValues"][step]["Created"] += 1
                         if defer:
                             sheet_stats["FormulaValues"][step]["Deferrals"] += 1
@@ -177,7 +177,7 @@ class ExcelImporter:
                     log.debug(
                         f"\tParameter NOT found in Excel but exists in XML, {node.fullpath} deleted.."
                     )
-                    stats["Deleted"] += 1
+                    stats["deleted"] += 1
                     sheet_stats["Parameters"]["Deleted"] += 1
             for node in list(tree.formula_values):
                 if node.fullpath not in seen_fvs:
@@ -188,7 +188,7 @@ class ExcelImporter:
                     log.debug(
                         f"\tFormulaValue NOT found in Excel but exists in XML, {node.fullpath} deleted.."
                     )
-                    stats["Deleted"] += 1
+                    stats["deleted"] += 1
                     sheet_stats["FormulaValues"][step]["Deleted"] += 1
 
             # per‐sheet summary
@@ -232,8 +232,9 @@ class ExcelImporter:
         log.info("------------------------------------------------")
         log.info(
             "Total → Created=%d\tUpdated=%d\tDeleted=%d",
-            stats["Created"],
-            stats["Updated"],
-            stats["Deleted"],
+            stats["created"],
+            stats["updated"],
+            stats["deleted"],
         )
         log.info("------------------------------------------------")
+        return stats
