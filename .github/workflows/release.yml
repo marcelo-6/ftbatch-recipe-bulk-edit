@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  build_windows:
+    uses: ./.github/workflows/build-windows.yml
+
+  publish_pypi:
+    uses: ./.github/workflows/publish-pypi.yml
+    secrets: inherit
+
+  create_release:
+    name: Create GitHub release
+    runs-on: ubuntu-latest
+    needs:
+      - build_windows
+      - publish_pypi
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build_windows.outputs.artifact_name }}
+          path: release-assets
+
+      - name: Build checksums
+        run: |
+          cd release-assets
+          sha256sum *.exe > SHA256SUMS.txt
+
+      - name: Extract release notes from changelog
+        run: python .github/scripts/extract_latest_changelog.py --changelog CHANGELOG.md --output RELEASE_NOTES.md
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
+          files: |
+            release-assets/*.exe
+            release-assets/SHA256SUMS.txt

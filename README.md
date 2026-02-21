@@ -1,5 +1,10 @@
 # Bulk Editor for FactoryTalk Batch Recipes
 
+[![CI](https://github.com/marcelo-6/ftbatch-bulk-edit/actions/workflows/ci.yml/badge.svg)](https://github.com/marcelo-6/ftbatch-bulk-edit/actions/workflows/ci.yml)
+[![Publish](https://github.com/marcelo-6/ftbatch-bulk-edit/actions/workflows/publish-pypi.yml/badge.svg)](https://github.com/marcelo-6/ftbatch-bulk-edit/actions/workflows/publish-pypi.yml)
+[![Coverage](https://img.shields.io/badge/coverage-gate%20%E2%89%A570%25-blue)](https://github.com/marcelo-6/ftbatch-bulk-edit/actions/workflows/ci.yml)
+[![PyPI version](https://img.shields.io/pypi/v/ftbatch-bulk-edit.svg)](https://pypi.org/project/ftbatch-bulk-edit/)
+
 A command-line tool (Python-based) that lets engineers bulk-edit Rockwell FactoryTalk Batch S88 recipes (`.pxml`, `.uxml`, and `.oxml`) by round-tripping through Excel. You can **export** your recipes (including any child references) into a spreadsheet, make batch changes to parameters and formula-values, then **import** the edits back to produce updated XML files—preserving element order, empty tags, and original structure.
 
 ---

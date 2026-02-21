@@ -1,0 +1,67 @@
+name: Build Windows Executable
+
+on:
+  workflow_call:
+    outputs:
+      artifact_name:
+        description: Uploaded artifact name
+        value: ${{ jobs.build.outputs.artifact_name }}
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.14"
+
+jobs:
+  build:
+    name: Build .exe with PyInstaller
+    runs-on: windows-latest
+    outputs:
+      artifact_name: ${{ steps.meta.outputs.artifact_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Install Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Sync dependencies
+        run: uv sync --python ${{ env.PYTHON_VERSION }} --all-groups
+
+      - name: Build executable
+        id: meta
+        shell: bash
+        run: |
+          version="$(uv run --no-sync python scripts/versioning.py --mode current)"
+          name="$(uv run --no-sync python scripts/project_meta.py --field name)"
+          artifact_name="${name}-${version}-windows-exe"
+
+          uv run --no-sync python scripts/generate_version_info.py \
+            --pyproject pyproject.toml \
+            --output build/version_info.txt \
+            --version-mode current
+
+          uv run --with pyinstaller pyinstaller \
+            --onefile \
+            --name "${name}.exe" \
+            app/main.py \
+            --version-file build/version_info.txt \
+            --distpath dist \
+            --workpath build/pyinstaller \
+            --specpath build
+
+          echo "artifact_name=${artifact_name}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload executable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.artifact_name }}
+          path: dist/*.exe
+          if-no-files-found: error

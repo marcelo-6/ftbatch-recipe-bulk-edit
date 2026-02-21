@@ -1,0 +1,85 @@
+name: Prepare Release
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: prepare-release-${{ github.event.workflow_run.head_branch || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: >-
+      ${{
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        (github.event.workflow_run.head_branch == 'master' || github.event.workflow_run.head_branch == 'main') &&
+        !startsWith(github.event.workflow_run.head_commit.message || '', 'chore(release): prepare for')
+      }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_branch }}
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
+
+      - name: Install git-cliff
+        uses: taiki-e/install-action@git-cliff
+
+      - name: Configure git author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Compute next version
+        id: version
+        run: |
+          current="$(python scripts/versioning.py --mode current)"
+          next="$(git-cliff --config cliff.toml --bumped-version --unreleased --tag-pattern '^v?[0-9]+\.[0-9]+\.[0-9]+$')"
+          tag="v${next}"
+
+          echo "current=${current}" >> "${GITHUB_OUTPUT}"
+          echo "next=${next}" >> "${GITHUB_OUTPUT}"
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+
+          if [ "${next}" = "${current}" ]; then
+            echo "should_release=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          if git rev-parse "${tag}" >/dev/null 2>&1; then
+            echo "should_release=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          echo "should_release=true" >> "${GITHUB_OUTPUT}"
+
+      - name: Update changelog
+        if: steps.version.outputs.should_release == 'true'
+        run: |
+          git-cliff \
+            --config cliff.toml \
+            --unreleased \
+            --tag "${{ steps.version.outputs.tag }}" \
+            --tag-pattern '^v?[0-9]+\.[0-9]+\.[0-9]+$' \
+            --prepend CHANGELOG.md
+
+      - name: Commit changelog and push tag
+        if: steps.version.outputs.should_release == 'true'
+        run: |
+          git add CHANGELOG.md
+          git commit -m "chore(release): prepare for ${{ steps.version.outputs.tag }}"
+          git tag "${{ steps.version.outputs.tag }}"
+          git push origin "HEAD:${{ github.event.workflow_run.head_branch }}" "${{ steps.version.outputs.tag }}"
+
+      - name: No release needed
+        if: steps.version.outputs.should_release != 'true'
+        run: |
+          echo "No releasable commits found. Current=${{ steps.version.outputs.current }} Next=${{ steps.version.outputs.next }}"

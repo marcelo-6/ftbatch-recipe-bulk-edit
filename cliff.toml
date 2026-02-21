@@ -137,4 +137,4 @@ repo = "ftbatch-bulk-edit"
 features_always_bump_minor = true
 breaking_always_bump_major = true
 bump_type = "patch"
-initial_tag = "0.0.1"
+initial_tag = "0.2.0"

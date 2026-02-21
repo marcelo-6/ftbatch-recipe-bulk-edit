@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -8,16 +9,23 @@ import cli.cli as cli_module
 from utils.errors import ValidationError
 
 runner = CliRunner()
+ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
+
+
+def _normalize_terminal_output(text: str) -> str:
+    # Rich/Click can inject ANSI styling differently across environments.
+    return ANSI_ESCAPE_RE.sub("", text)
 
 
 def test_help_includes_commands() -> None:
-    result = runner.invoke(cli_module.app, ["--help"])
+    result = runner.invoke(cli_module.app, ["--help"], color=False)
+    output = _normalize_terminal_output(result.output)
     assert result.exit_code == 0
-    assert "xml2excel" in result.output
-    assert "excel2xml" in result.output
-    assert "--debug" in result.output
-    assert "--progress" in result.output
-    assert "--no-progress" in result.output
+    assert "xml2excel" in output
+    assert "excel2xml" in output
+    assert re.search(r"-+\s*debug\b", output, flags=re.IGNORECASE)
+    assert re.search(r"-+\s*progress\b", output, flags=re.IGNORECASE)
+    assert re.search(r"-+\s*no-progress\b", output, flags=re.IGNORECASE)
 
 
 def test_version_flag_shows_project_version(monkeypatch) -> None:

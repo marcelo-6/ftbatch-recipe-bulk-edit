@@ -1,7 +1,6 @@
 [project]
 name = "ftbatch-bulk-edit"
-version = "0.2.1" # removed for dynamic versions
-# dynamic = ["version"]
+dynamic = ["version"]
 authors = [
   { name = "Marcelo Amorim", email = "marcelo.amorim@wmeng.com" },
   { name = "Dan Nguyen", email = "dan.nguyen@wmeng.com" },
@@ -13,49 +12,43 @@ dependencies = [
     "lxml>=6.0.2",
     "openpyxl>=3.1.5",
     "rich>=12.3.0",
-    "toml>=0.10.2",
     "typer>=0.24.0",
 ]
 
+[project.scripts]
+ftbatch-bulk-edit = "main:main"
+
 [dependency-groups]
 dev = [
+    "coverage>=7.10.6",
     "mypy>=1.15.0",
     "pre-commit>=4.5.1",
     "pydantic>=2.12.5",
     "pytest>=8.3.4",
+    "ruff>=0.13.0",
 ]
+
+[build-system]
+requires = [
+    "setuptools>=69",
+    "setuptools-scm[toml]>=8",
+    "wheel>=0.45",
+]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "app"}
+py-modules = ["main"]
+
+[tool.setuptools.packages.find]
+where = ["app"]
+
+[tool.setuptools_scm]
+fallback_version = "0.0.0"
+local_scheme = "no-local-version"
+tag_regex = "^(?:v)?(?P<version>\\d+\\.\\d+\\.\\d+)$"
 
 [tool.pytest.ini_options]
 pythonpath = [
     "app" # the pytests can import modules from this folder
 ]
-
-[tool.commitizen]
-name = "cz_conventional_commits"
-tag_format = "$version"
-version_scheme = "semver"
-version_provider = "pep621"
-update_changelog_on_bump = true
-major_version_zero = true
-
-# [semantic_release.branches.main]
-# match = "(main|master)"
-# prerelease_token = "rc"
-# prerelease = false
-
-
-# ! Build related tables
-
-# [tool.uv-dynamic-versioning]
-# vcs = "git"
-# style = "semver"
-
-# [build-system]
-# requires = ["hatchling", "uv-dynamic-versioning"]
-# build-backend = "hatchling.build"
-
-# [tool.hatch.version]
-# source = "uv-dynamic-versioning"
-
-# [tool.hatch.build.hooks.uv-dynamic-versioning]
-# version-file = "_version.py"
