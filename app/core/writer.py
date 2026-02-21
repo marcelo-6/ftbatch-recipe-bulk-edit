@@ -4,6 +4,7 @@ XMLWriter: serialize updated RecipeTree models back to XML files.
 
 import os
 from datetime import datetime
+from collections.abc import Callable
 
 
 class XMLWriter:
@@ -11,7 +12,12 @@ class XMLWriter:
     Write one or more RecipeTree instances to timestamped output folder.
     """
 
-    def write(self, trees: list, base_dir: str = None) -> str:
+    def write(
+        self,
+        trees: list,
+        base_dir: str = None,
+        progress_cb: Callable[[str, dict], None] | None = None,
+    ) -> str:
         """
         Serialize all modified RecipeTree objects back to XML files in a timestamped subfolder.
 
@@ -29,6 +35,13 @@ class XMLWriter:
         Returns:
             output_dir: The full path of the created output folder.
         """
+        def _emit(event: str, **payload) -> None:
+            if progress_cb is not None:
+                progress_cb(event, payload)
+
+        total = len(trees)
+        _emit("start", total=total)
+
         first = trees[0]
         root_dir = base_dir or os.path.join(
             os.path.dirname(first.filepath), "converted-outputs"
@@ -37,7 +50,7 @@ class XMLWriter:
         out_dir = os.path.join(root_dir, stamp)
         os.makedirs(out_dir, exist_ok=True)
 
-        for t in trees:
+        for index, t in enumerate(trees, start=1):
             for node in t.parameters + t.formula_values:
                 node.reorder_children()
             fname = os.path.basename(t.filepath)
@@ -45,5 +58,13 @@ class XMLWriter:
             t.tree.write(
                 out_path, encoding="utf-8", xml_declaration=True, pretty_print=True
             )
+            _emit(
+                "file_written",
+                index=index,
+                total=total,
+                filename=fname,
+                output_path=out_path,
+            )
 
+        _emit("finished", total=total, output_dir=out_dir)
         return out_dir

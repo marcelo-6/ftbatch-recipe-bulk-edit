@@ -18,6 +18,7 @@ A command-line tool (Python-based) that lets engineers bulk-edit Rockwell Factor
   - [Usage Overview](#usage-overview)
     - [Export XML to Excel (`xml2excel`)](#export-xml-to-excel-xml2excel)
     - [Import Excel to XML (`excel2xml`)](#import-excel-to-xml-excel2xml)
+    - [Global Options](#global-options)
   - [Debug Mode](#debug-mode)
   - [Flow Chart](#flow-chart)
   - [Example Excel Output](#example-excel-output)
@@ -48,13 +49,17 @@ A command-line tool (Python-based) that lets engineers bulk-edit Rockwell Factor
    - **Create** if you add a new `FullPath` row (with one valid data-type column).
 
 5. **Detailed Logging**  
-   - INFO-level messages to console.  
-   - DEBUG-level (with `--debug`) to `batch_bulk_editor.log`.
+   - Console keeps high-signal warnings/summaries with Rich formatting.  
+   - DEBUG-level detail (with `--debug`) is written to `batch_bulk_editor.log`.
 
 6. **ParamExpression support**
    - For FormulaValues you can now supply a real‐time expression.
    - In Excel, fill the appropriate data‐type column (Real/Integer/String) with the literal `ParamExpression`, and put the actual expression into the new **ParamExpression** column (appearing right after Defer).
    - On import, the tool will generate a `<ParamExpression/>` tag, insert your formula into `<Real>` (or `<Integer>`, etc.), and preserve correct XML ordering.
+
+![cli](docs/images/cli.png)
+
+![cli-results](docs/images/cli-example.png)
 
 ---
 
@@ -156,8 +161,8 @@ python app/main.py [GLOBAL_OPTIONS] excel2xml --xml PATH_TO_XML --excel EDITED_X
 | Option | Description |
 | --- | --- |
 | `--debug` | Write DEBUG logs to `batch_bulk_editor.log`. |
-| `--progress` | Force progress bars on. |
-| `--no-progress` | Disable progress bars. |
+| `--progress` | Force rich progress bars on. |
+| `--no-progress` | Disable progress bars (recommended for CI/piped logs). |
 | `--version` | Show CLI version and exit. |
 | `--help` | Show command help. |
 
@@ -172,13 +177,16 @@ python app/main.py --debug xml2excel --xml myRecipe.pxml --excel out.xlsx
 ```
 
 * Creates/appends `batch_bulk_editor.log` at DEBUG level.
-* Console remains at INFO level.
+* Console logs are rendered with Rich coloring.
+* Repeated warning patterns are summarized in console output while debug file logs remain detailed.
 
 Use `--progress` or `--no-progress` before the subcommand to control progress bars:
 
 ```bash
 python app/main.py --no-progress excel2xml --xml myRecipe.pxml --excel edits.xlsx
 ```
+
+By default, progress bars are enabled only for interactive terminals.
 
 ---
 

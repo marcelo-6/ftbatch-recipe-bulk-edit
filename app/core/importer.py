@@ -4,6 +4,7 @@ ExcelImporter: apply changes from an Excel workbook into RecipeTree models.
 
 import os
 import logging
+from collections.abc import Callable
 from collections import defaultdict
 from openpyxl import load_workbook
 from utils.string import safe_strip
@@ -15,7 +16,12 @@ class ExcelImporter:
     Import changes from Excel workbook into RecipeTree instances.
     """
 
-    def import_changes(self, excel_path: str, trees: list):
+    def import_changes(
+        self,
+        excel_path: str,
+        trees: list,
+        progress_cb: Callable[[str, dict], None] | None = None,
+    ):
         """
         Read an edited Excel workbook and apply create/update/delete operations to the RecipeTree models.
 
@@ -39,6 +45,10 @@ class ExcelImporter:
         log = logging.getLogger(__name__)
         debug_enabled = log.isEnabledFor(logging.DEBUG)  # noqa: F841
 
+        def _emit(event: str, **payload) -> None:
+            if progress_cb is not None:
+                progress_cb(event, payload)
+
         wb = load_workbook(excel_path)
         errors = []
 
@@ -56,13 +66,17 @@ class ExcelImporter:
 
         # Map sheet name to RecipeTree by basename
         tree_map = {os.path.basename(t.filepath): t for t in trees}
+        total_sheets = len(wb.sheetnames)
+        _emit("start", total=total_sheets)
 
-        for sheet in wb.sheetnames:
+        for index, sheet in enumerate(wb.sheetnames, start=1):
             if sheet not in tree_map:
                 log.warning("No matching XML for sheet '%s', skipping", sheet)
+                _emit("sheet_skipped", index=index, total=total_sheets, sheet=sheet)
                 continue
 
             log.debug(f"Sheet {sheet}")
+            _emit("sheet_start", index=index, total=total_sheets, sheet=sheet)
 
             # initialize sheet‐level stats
             sheet_stats = {
@@ -205,16 +219,16 @@ class ExcelImporter:
             )
 
             if any_sheet_changes:
-                log.info(f"\tChanges for '{sheet}'")
-                log.info(
+                log.debug("Changes for '%s'", sheet)
+                log.debug(
                     "Parameters → Created=%d\tUpdated=%d\tDeleted=%d",
                     p["Created"],
                     p["Updated"],
                     p["Deleted"],
                 )
-                log.info("FormulaValues by step:")
+                log.debug("FormulaValues by step:")
                 for step, f in sheet_stats["FormulaValues"].items():
-                    log.info(
+                    log.debug(
                         "\t[%s] Created=%d\tUpdated=%d\tOut of which %d are Deferrals\tDeleted=%d",
                         step,
                         f["Created"],
@@ -222,19 +236,44 @@ class ExcelImporter:
                         f["Deferrals"],
                         f["Deleted"],
                     )
-                log.info("------------------------------------------------")
+                log.debug("------------------------------------------------")
+            sheet_created = p["Created"] + sum(
+                f["Created"] for f in sheet_stats["FormulaValues"].values()
+            )
+            sheet_updated = p["Updated"] + sum(
+                f["Updated"] for f in sheet_stats["FormulaValues"].values()
+            )
+            sheet_deleted = p["Deleted"] + sum(
+                f["Deleted"] for f in sheet_stats["FormulaValues"].values()
+            )
+            _emit(
+                "sheet_done",
+                index=index,
+                total=total_sheets,
+                sheet=sheet,
+                created=sheet_created,
+                updated=sheet_updated,
+                deleted=sheet_deleted,
+            )
 
         if errors:
             raise ValidationError(f"{len(errors)} errors")
 
         # overall summary
-        log.info("-- Summary of changes made by excel2xml Tool ---")
-        log.info("------------------------------------------------")
-        log.info(
+        log.debug(
+            "Workbook import summary: created=%d updated=%d deleted=%d",
+            stats["created"],
+            stats["updated"],
+            stats["deleted"],
+        )
+        log.debug("-- Summary of changes made by excel2xml Tool ---")
+        log.debug("------------------------------------------------")
+        log.debug(
             "Total → Created=%d\tUpdated=%d\tDeleted=%d",
             stats["created"],
             stats["updated"],
             stats["deleted"],
         )
-        log.info("------------------------------------------------")
+        log.debug("------------------------------------------------")
+        _emit("finished", total=total_sheets, stats=stats)
         return stats

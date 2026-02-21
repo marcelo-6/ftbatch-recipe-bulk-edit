@@ -10,12 +10,12 @@ import tomllib
 from dataclasses import dataclass
 from importlib import metadata
 from pathlib import Path
-from typing import Annotated, Callable, TypeVar
+from typing import Annotated
 
 import typer
 from rich.console import Console
-from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 
+from cli.ui import CLIRuntimeUI
 from core.exporter import ExcelExporter
 from core.importer import ExcelImporter
 from core.parser import XMLParser
@@ -25,8 +25,6 @@ from utils.logging_cfg import configure_logging
 
 logger = logging.getLogger(__name__)
 console = Console(stderr=True)
-
-T = TypeVar("T")
 
 
 @dataclass(slots=True)
@@ -74,32 +72,8 @@ def _state(ctx: typer.Context) -> CLIState:
 
 def _progress_enabled(progress: bool | None) -> bool:
     if progress is None:
-        return sys.stderr.isatty()
+        return console.is_terminal and sys.stderr.isatty()
     return progress
-
-
-def _run_steps(steps: list[tuple[str, Callable[[], T]]], show_progress: bool) -> list[T]:
-    results: list[T] = []
-    if show_progress:
-        with Progress(
-            SpinnerColumn(style="cyan"),
-            TextColumn("{task.description}"),
-            BarColumn(bar_width=None),
-            TimeElapsedColumn(),
-            console=console,
-            transient=True,
-        ) as progress:
-            task_id = progress.add_task("[cyan]Starting...[/cyan]", total=len(steps))
-            for description, callback in steps:
-                progress.update(task_id, description=f"[cyan]{description}[/cyan]")
-                results.append(callback())
-                progress.advance(task_id)
-        return results
-
-    for description, callback in steps:
-        console.print(f"[cyan]• {description}[/cyan]")
-        results.append(callback())
-    return results
 
 
 def _validate_input_file(path: Path, option_name: str) -> None:
@@ -149,7 +123,7 @@ def common_options(
     Global CLI options.
     """
     _ = version
-    configure_logging(debug)
+    configure_logging(debug, console=console)
     ctx.obj = CLIState(debug=debug, progress=progress)
 
 
@@ -186,26 +160,12 @@ def xml2excel_command(
     try:
         parser = XMLParser()
         exporter = ExcelExporter()
-        trees: list | None = None
-
-        def parse_step() -> list:
-            nonlocal trees
-            trees = parser.parse(str(xml))
-            return trees
-
-        def export_step() -> None:
-            if trees is None:
-                raise RuntimeError("XML parse step did not produce trees.")
+        with CLIRuntimeUI(console=console, enable_progress=show_progress) as ui:
+            trees = parser.parse(str(xml), progress_cb=ui.on_parse_progress)
+            ui.ensure_task("export", "Writing Excel workbook", total=1)
             exporter.export(trees, str(excel))
-
-        _run_steps(
-            [
-                ("Parsing XML files", parse_step),
-                ("Writing Excel workbook", export_step),
-            ],
-            show_progress=show_progress,
-        )
-        console.print(f"[bold green]Excel written to:[/bold green] {excel}")
+            ui.complete_task("export", description="Wrote Excel workbook (1/1)")
+            ui.success(f"Excel written to: {excel}")
     except ValidationError as exc:
         console.print(f"[bold red]Validation error:[/bold red] {exc}")
         raise typer.Exit(code=1) from exc
@@ -250,46 +210,21 @@ def excel2xml_command(
         parser = XMLParser()
         importer = ExcelImporter()
         writer = XMLWriter()
-
-        trees: list | None = None
-        stats: dict[str, int] | None = None
-        output_dir: str | None = None
-
-        def parse_step() -> list:
-            nonlocal trees
-            trees = parser.parse(str(xml))
-            return trees
-
-        def import_step() -> dict[str, int]:
-            nonlocal stats
-            if trees is None:
-                raise RuntimeError("XML parse step did not produce trees.")
-            stats = importer.import_changes(str(excel), trees)
-            return stats
-
-        def write_step() -> str:
-            nonlocal output_dir
-            if trees is None:
-                raise RuntimeError("XML parse step did not produce trees.")
-            output_dir = writer.write(trees)
-            return output_dir
-
-        _run_steps(
-            [
-                ("Parsing XML files", parse_step),
-                ("Applying workbook edits", import_step),
-                ("Writing updated XML files", write_step),
-            ],
-            show_progress=show_progress,
-        )
-
-        if stats is not None:
-            console.print(
-                "[bold green]Import summary:[/bold green] "
-                f"created={stats['created']}, updated={stats['updated']}, deleted={stats['deleted']}"
+        with CLIRuntimeUI(console=console, enable_progress=show_progress) as ui:
+            trees = parser.parse(str(xml), progress_cb=ui.on_parse_progress)
+            stats = importer.import_changes(
+                str(excel),
+                trees,
+                progress_cb=ui.on_import_progress,
             )
-        if output_dir is not None:
-            console.print(f"[bold green]XML written to:[/bold green] {output_dir}")
+            output_dir = writer.write(
+                trees,
+                progress_cb=ui.on_write_progress,
+            )
+            ui.success(
+                f"Import summary: created={stats['created']}, updated={stats['updated']}, deleted={stats['deleted']}"
+            )
+            ui.success(f"XML written to: {output_dir}")
     except ValidationError as exc:
         console.print(f"[bold red]Validation error:[/bold red] {exc}")
         raise typer.Exit(code=1) from exc

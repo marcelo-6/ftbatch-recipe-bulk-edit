@@ -37,7 +37,7 @@ def test_xml2excel_invokes_parser_and_exporter(
     calls: dict[str, object] = {}
 
     class DummyParser:
-        def parse(self, path: str):
+        def parse(self, path: str, progress_cb=None):
             calls["parse"] = path
             return ["TREE"]
 
@@ -76,17 +76,17 @@ def test_excel2xml_invokes_parse_import_write(
     calls: dict[str, object] = {}
 
     class DummyParser:
-        def parse(self, path: str):
+        def parse(self, path: str, progress_cb=None):
             calls["parse"] = path
             return ["TREE"]
 
     class DummyImporter:
-        def import_changes(self, excel: str, trees):
+        def import_changes(self, excel: str, trees, progress_cb=None):
             calls["import"] = (excel, trees)
             return {"created": 1, "updated": 2, "deleted": 3}
 
     class DummyWriter:
-        def write(self, trees):
+        def write(self, trees, progress_cb=None):
             calls["write"] = trees
             return str(out_dir)
 
@@ -121,11 +121,11 @@ def test_excel2xml_validation_error_returns_exit_code_1(
     excel_path.write_text("placeholder", encoding="utf-8")
 
     class DummyParser:
-        def parse(self, path: str):
+        def parse(self, path: str, progress_cb=None):
             return ["TREE"]
 
     class DummyImporter:
-        def import_changes(self, excel: str, trees):
+        def import_changes(self, excel: str, trees, progress_cb=None):
             raise ValidationError("invalid workbook")
 
     monkeypatch.setattr(cli_module, "XMLParser", DummyParser)
