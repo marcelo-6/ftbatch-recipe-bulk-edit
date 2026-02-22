@@ -19,7 +19,7 @@ jobs:
       artifact_name: ${{ steps.meta.outputs.artifact_name }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -45,7 +45,7 @@ jobs:
           echo "artifact_name=${artifact_name}" >> "${GITHUB_OUTPUT}"
 
       - name: Upload executable artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ steps.meta.outputs.artifact_name }}
           path: dist/*.exe
