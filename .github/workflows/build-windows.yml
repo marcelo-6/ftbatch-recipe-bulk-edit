@@ -37,8 +37,8 @@ jobs:
         id: meta
         shell: bash
         run: |
-          version="$(uv run --no-sync python scripts/versioning.py --mode current)"
-          name="$(uv run --no-sync python scripts/project_meta.py --field name)"
+          version="$(uv run --no-sync python scripts/versioning.py --pyproject pyproject.toml --mode current)"
+          name="$(uv run --no-sync python scripts/project_meta.py --pyproject pyproject.toml --field name)"
           artifact_name="${name}-${version}-windows-exe"
 
           just build
