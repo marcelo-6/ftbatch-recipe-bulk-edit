@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2026-02-22
+
+### <!-- 3 -->Documentation
+- Added more classifiers to pyproject.toml metadata  by @marcelo-6 ([732eb77](https://github.com/marcelo-6/ftbatch-bulk-edit/commit/732eb77221506e509134ef3fce01492d09de0bac))
+
+
 ## [0.2.2] - 2026-02-22
 
 ### <!-- 5 -->Styling
