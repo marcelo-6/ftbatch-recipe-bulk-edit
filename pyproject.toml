@@ -1,12 +1,7 @@
 [project]
 name = "ftbatch-bulk-edit"
 dynamic = ["version"]
-authors = [
-  { name = "Marcelo Amorim", email = "marc.amorim6@gmail.com" },
-  { name = "Dan Nguyen", email = "dan.nguyen@wmeng.com" },
-]
-description = "FactoryTalk Batch Recipe Bulk Editor"
-readme = "README.md"
+
 requires-python = ">=3.14,<3.15"
 dependencies = [
     "lxml>=6.0.2",
@@ -14,6 +9,30 @@ dependencies = [
     "rich>=12.3.0",
     "typer>=0.24.0",
 ]
+authors = [
+  { name = "Marcelo Amorim", email = "marc.amorim6@gmail.com" },
+  { name = "Dan Nguyen", email = "dan.nguyen@wmeng.com" },
+]
+maintainers = [
+  { name = "Marcelo Amorim", email = "marc.amorim6@gmail.com" },
+]
+description = "FactoryTalk Batch Recipe Bulk Editor"
+readme = "README.md"
+license = "MIT"
+keywords = ["FactoryTalk Batch", "ftbatch", "ias88", "defer", "bulk edit"]
+classifiers = [
+  "Development Status :: 5 - Stable",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.14",
+]
+
+[project.urls]
+Homepage = "https://github.com/marcelo-6/ftbatch-bulk-edit"
+Documentation = "https://github.com/marcelo-6/ftbatch-bulk-edit"
+Repository = "https://github.com/marcelo-6/ftbatch-bulk-edit.git"
+Issues = "https://github.com/marcelo-6/ftbatch-bulk-edit/issues"
+Changelog = "https://github.com/marcelo-6/ftbatch-bulk-edit/blob/main/CHANGELOG.md"
 
 [project.scripts]
 ftbatch-bulk-edit = "main:main"
