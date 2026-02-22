@@ -23,7 +23,10 @@ keywords = ["FactoryTalk Batch", "ftbatch", "ias88", "defer", "bulk edit"]
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Developers",
+  "Intended Audience :: Manufacturing",
   "Programming Language :: Python :: 3.14",
+  "Topic :: Text Processing :: Markup :: XML",
+  "Topic :: Utilities",
 ]
 
 [project.urls]
