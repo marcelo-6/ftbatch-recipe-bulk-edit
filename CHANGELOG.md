@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2026-02-22
+
+### <!-- 5 -->Styling
+- Updated after lint  by @marcelo-6 ([36a6587](https://github.com/marcelo-6/ftbatch-bulk-edit/commit/36a65870590fc856a13474ef15b4f447da90a45e))
+
+
 ## [0.2.1] - 2026-02-22
 
 ### <!-- 1 -->Bug Fixes
