@@ -25,6 +25,7 @@ jobs:
 
       - name: Get version from tag
         id: version
+        shell: bash
         run: |
           VERSION=$(git describe --tags --abbrev=0)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
