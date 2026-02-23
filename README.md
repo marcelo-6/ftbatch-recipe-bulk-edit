@@ -90,33 +90,33 @@ Useful for large recipes with many defered parameters</p>
 
 ### Using pip
 
-1. **Clone** this repo.  
-2. **Install** dependencies:
+1. **Install**:
 
    ```bash
-   pip ftbatch-bulk-edit
+   pip install ftbatch-bulk-edit
    ```
 
-3. **Run**:
+2. **Run**:
 
    ```bash
    ftbatch-bulk-edit xml2excel --xml yourRecipe.pxml --excel out.xlsx
    ```
 
-### Using uv as the Package Manager
+### Using uv
 
 ```bash
 uv sync --python 3.14
-uv run python app/main.py xml2excel --xml yourRecipe.pxml --excel out.xlsx
+uv pip install ftbatch-bulk-edit
+uv run python ftbatch-bulk-edit xml2excel --xml yourRecipe.pxml --excel out.xlsx
 ```
 
 #### Using the example in the repo
 
 ```bash
-uv run python app/main.py --progress xml2excel --xml tests/examples/LNP/P_LNP.PXML --excel tests/examples/converted-outputs/output.xlsx
+uv run ftbatch-bulk-edit --progress xml2excel --xml tests/examples/LNP/P_LNP.PXML --excel tests/examples/converted-outputs/output.xlsx
 ```
 
-### Using the Justfile (Recommended)
+### Using the Justfile
 
 We provide a `justfile` to automate setup, testing, linting, coverage, and executable builds:
 
